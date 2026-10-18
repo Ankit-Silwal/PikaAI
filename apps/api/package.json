@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "check": "tsc --noEmit",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "test": "tsx --test test/auth.test.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.1",

@@ -1,7 +1,8 @@
 import { app } from "./app.js";
 import { prisma } from "./configs/db.js";
+import { env } from "./configs/env.js";
 
-const port = Number(process.env.PORT ?? 3001);
+const port = env.port;
 
 try {
   await prisma.$queryRaw`SELECT 1`;

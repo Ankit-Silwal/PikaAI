@@ -17,6 +17,8 @@
     "start": "npm run start --workspace=@pikaai/backend",
     "check": "turbo run check",
     "db:generate": "npm run db:generate --workspace=@pikaai/backend",
+    "db:migrate": "npm run db:migrate --workspace=@pikaai/backend",
+    "test": "npm run db:generate && npm run test --workspace=@pikaai/backend",
     "infra:up": "docker compose up -d --wait postgres redis",
     "db:up": "docker compose up -d --wait postgres redis",
     "db:down": "docker compose stop postgres",
