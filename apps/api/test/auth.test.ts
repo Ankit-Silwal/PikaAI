@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import { app } from "../src/app.js";
 import { prisma } from "../src/configs/db.js";
 import { env } from "../src/configs/env.js";
+import type { AuthTokens, AuthUser } from "../src/modules/auth/auth.types.js";
 
 const email = "auth-test-" + randomUUID() + "@example.com";
 const raceEmail = "auth-race-" + randomUUID() + "@example.com";
@@ -32,9 +33,7 @@ after(async () => {
   }
 });
 
-type Tokens = { accessToken: string; refreshToken: string };
-
-async function getTokens(response: Response): Promise<Tokens> {
+async function getTokens(response: Response): Promise<AuthTokens> {
   const body = await response.clone().json();
   const values = Object.fromEntries(response.headers.getSetCookie().map(header => {
     const cookie = header.split(";")[0]!;
@@ -65,9 +64,9 @@ function me(accessToken?: string) {
 }
 
 test("Bearer JWT authentication with refresh cookies against PostgreSQL", async t => {
-  let user: { user_id: string; email: string; role: string };
-  let registered: Tokens;
-  let active: Tokens;
+  let user: AuthUser;
+  let registered: AuthTokens;
+  let active: AuthTokens;
 
   await t.test("validates credentials, including bcrypt's UTF-8 byte limit", async () => {
     for (const body of [undefined, {}, { email: "invalid", password },

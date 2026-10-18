@@ -18,6 +18,7 @@ apps/api/
         auth.routes.ts
         auth.controller.ts
         auth.service.ts
+        auth.types.ts
       health/
         health.routes.ts
         health.controller.ts

@@ -3,6 +3,7 @@ import { env } from "../../configs/env.js";
 import { HttpError } from "../../utils/http-error.js";
 import * as authService from "./auth.service.js";
 import { REFRESH_TOKEN_SECONDS } from "../../utils/jwt.js";
+import type { AuthCredentials, AuthResponse, AuthUserResponse } from "./auth.types.js";
 
 const cookieOptions: CookieOptions = {
   httpOnly: true,
@@ -15,7 +16,7 @@ function setRefreshCookie(res: Response, refreshToken: string): void {
   res.cookie("refreshToken", refreshToken, { ...cookieOptions, maxAge: REFRESH_TOKEN_SECONDS * 1000 });
 }
 
-function credentials(body: unknown): { email: string; password: string } {
+function credentials(body: unknown): AuthCredentials {
   if (!body || typeof body !== "object" || !("email" in body) || !("password" in body) ||
       typeof body.email !== "string" || typeof body.password !== "string") {
     throw new HttpError(400, "Email and password are required");
@@ -30,21 +31,21 @@ function credentials(body: unknown): { email: string; password: string } {
   return { email, password: body.password };
 }
 
-export async function register(req: Request, res: Response): Promise<void> {
+export async function register(req: Request, res: Response<AuthResponse>): Promise<void> {
   const { email, password } = credentials(req.body);
   const result = await authService.register(email, password);
   setRefreshCookie(res, result.tokens.refreshToken);
   res.status(201).json({ user: result.user, accessToken: result.tokens.accessToken });
 }
 
-export async function login(req: Request, res: Response): Promise<void> {
+export async function login(req: Request, res: Response<AuthResponse>): Promise<void> {
   const { email, password } = credentials(req.body);
   const result = await authService.login(email, password);
   setRefreshCookie(res, result.tokens.refreshToken);
   res.json({ user: result.user, accessToken: result.tokens.accessToken });
 }
 
-export async function refresh(req: Request, res: Response): Promise<void> {
+export async function refresh(req: Request, res: Response<AuthResponse>): Promise<void> {
   const result = await authService.refresh(req.cookies?.refreshToken);
   setRefreshCookie(res, result.tokens.refreshToken);
   res.json({ user: result.user, accessToken: result.tokens.accessToken });
@@ -56,6 +57,6 @@ export async function logout(req: Request, res: Response): Promise<void> {
   res.sendStatus(204);
 }
 
-export function me(_req: Request, res: Response): void {
+export function me(_req: Request, res: Response<AuthUserResponse>): void {
   res.json({ user: res.locals.user });
 }

@@ -1,16 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { env } from "../configs/env.js";
-import type { Role } from "../generated/prisma/client.js";
+import type { AuthTokens, AuthUser, TokenType } from "../modules/auth/auth.types.js";
 import { HttpError } from "./http-error.js";
-
-export type AuthUser = { user_id: string; email: string; role: Role };
-type TokenType = "access" | "refresh";
 
 export const ACCESS_TOKEN_SECONDS = 24 * 60 * 60;
 export const REFRESH_TOKEN_SECONDS = 7 * 24 * 60 * 60;
 
-export function createTokens(user: AuthUser) {
+export function createTokens(user: AuthUser): AuthTokens {
   function sign(type: TokenType) {
     return jwt.sign(
       { email: user.email, role: user.role, type },
