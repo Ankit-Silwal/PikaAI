@@ -14,13 +14,54 @@ enum Role {
   ADMIN
 }
 
+enum OrganizationJoinPolicy {
+  OPEN
+  APPROVAL_REQUIRED
+}
+
+enum OrganizationRole {
+  ADMIN
+  MEMBER
+}
+
+enum OrganizationMembershipStatus {
+  PENDING
+  ACTIVE
+}
+
 model User {
-  user_id       String   @id @default(uuid()) @db.Uuid
-  role          Role     @default(USER)
-  refreshToken  String?  @db.Char(64)
-  email         String   @unique @db.VarChar(254)
+  user_id       String                   @id @default(uuid()) @db.Uuid
+  role          Role                     @default(USER)
+  refreshToken  String?                  @db.Char(64)
+  email         String                   @unique @db.VarChar(254)
   password_hash String
-  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  created_at    DateTime                 @default(now()) @db.Timestamptz(6)
+  memberships   OrganizationMembership[]
 
   @@map("auth_users")
+}
+
+model Organization {
+  organization_id String                   @id @default(uuid()) @db.Uuid
+  name            String                   @db.VarChar(100)
+  join_policy     OrganizationJoinPolicy
+  invite_code     String                   @unique @db.Char(32)
+  created_at      DateTime                 @default(now()) @db.Timestamptz(6)
+  memberships     OrganizationMembership[]
+
+  @@map("auth_organizations")
+}
+
+model OrganizationMembership {
+  organization_id String                       @db.Uuid
+  user_id         String                       @db.Uuid
+  role            OrganizationRole             @default(MEMBER)
+  status          OrganizationMembershipStatus
+  created_at      DateTime                     @default(now()) @db.Timestamptz(6)
+  organization    Organization                 @relation(fields: [organization_id], references: [organization_id], onDelete: Cascade)
+  user            User                         @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@id([organization_id, user_id])
+  @@index([user_id])
+  @@map("auth_organization_memberships")
 }
