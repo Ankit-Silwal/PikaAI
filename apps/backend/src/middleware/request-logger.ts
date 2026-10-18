@@ -6,11 +6,12 @@ export function requestLogger({ logRequests = true } = {}): RequestHandler {
     req.id = randomUUID();
     res.setHeader("X-Request-Id", req.id);
     const startedAt = performance.now();
+    const path = req.originalUrl.split("?")[0];
     res.on("finish", () => {
       if (logRequests) console.info(JSON.stringify({
         requestId: req.id,
         method: req.method,
-        path: req.path,
+        path,
         status: res.statusCode,
         durationMs: Math.round(performance.now() - startedAt),
       }));

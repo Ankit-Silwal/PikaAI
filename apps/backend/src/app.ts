@@ -11,6 +11,7 @@ import type { PrismaClient } from "./generated/prisma/client.js";
 import type { AuthState } from "./types/auth.js";
 import { AuthService } from "./services/auth.service.js";
 import type { TokenService } from "./services/token.service.js";
+import { ResourceService } from "./services/resource.service.js";
 
 export interface AppOptions {
   prisma: PrismaClient;
@@ -80,7 +81,7 @@ export function createApp({
   // Only workspace document uploads need a larger JSON budget.
   app.use("/api/workspaces", express.json({ limit: "512kb" }));
   app.use(express.json({ limit: "16kb" }));
-  app.use("/api", createApiRoutes(authService, authLimit));
+  app.use("/api", createApiRoutes(authService, new ResourceService(prisma), authLimit));
   app.use(notFound);
   app.use(errorHandler);
   return app;

@@ -8,6 +8,8 @@ import { redis } from "../../src/config/redis.js";
 import { env } from "../../src/config/env.js";
 import { TokenService } from "../../src/services/token.service.js";
 import { createRedisRateLimitStore, RedisAuthState } from "../../src/services/redis-auth-state.service.js";
+import { PrismaClient } from "../../src/generated/prisma/client.js";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const runId = randomUUID();
 const prefix = `pikaai:test:${runId}:`;
@@ -146,5 +148,21 @@ describe("authentication with local Prisma/PostgreSQL and Redis", { concurrency:
     assert.equal(ready.body.redis, "unavailable");
     assert.equal(ready.body.database, "connected");
     await request(appWithOfflineRedis).get("/health/live").expect(200);
+  });
+
+  test("an unreachable PostgreSQL dependency returns 503 without exposing connection details", async (t) => {
+    t.mock.method(console, "error", () => {});
+    const unavailable = new PrismaClient({
+      adapter: new PrismaPg({ ...env.database, host: "127.0.0.1", port: 9, connectionTimeoutMillis: 500 }),
+    });
+    try {
+      const offlineApp = createApp({ prisma: unavailable, tokens, authState: state, logRequests: false });
+      const response = await request(offlineApp).get("/api/auth/me")
+        .auth(accessToken, { type: "bearer" }).expect(503);
+      assert.equal(response.body.error.message, "Database service unavailable");
+      assert.ok(!response.text.includes("127.0.0.1"));
+      await request(offlineApp).get("/health/ready").expect(503);
+      await request(offlineApp).get("/health/live").expect(200);
+    } finally { await unavailable.$disconnect(); }
   });
 });

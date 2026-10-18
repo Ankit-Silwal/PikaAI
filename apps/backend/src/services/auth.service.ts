@@ -38,7 +38,9 @@ export class AuthService {
   }
 
   async login(input: z.infer<typeof loginSchema>, activity: ClientActivity) {
-    const user = await this.prisma.user.findUnique({ where: { email: input.email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email: input.email }, select: { ...publicUserSelect, passwordHash: true },
+    });
     if (!user) {
       await verifyUnknownPassword(input.password);
       throw new HttpError(401, "Invalid email or password");

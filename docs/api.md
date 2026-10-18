@@ -56,8 +56,9 @@ organization. Every lookup checks membership in PostgreSQL; tokens do not embed
 tenant roles. Inaccessible and missing resources both return 404. Member-invite
 and membership-management endpoints are deferred. Workspace descriptions are
 at most 1000 characters. Document titles are trimmed (1–200 characters); content
-is nonblank plain text (1–100000 characters), preserved as submitted. Resource
-JSON bodies have a 512 KB limit. Documents support only GET and POST: no editing,
+is nonblank plain text (1–100000 characters), preserved as submitted. JSON bodies
+have a 16 KB limit; the `/workspaces` subtree permits 512 KB for documents.
+Documents support only GET and POST: no editing,
 deletion, file uploads, embeddings, retrieval, or RAG pipeline yet.
 
 Common status codes: 400 invalid input, 401 missing/invalid/expired/revoked token,
