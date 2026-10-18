@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "passThroughEnv": ["NODE_ENV", "HOST", "PORT", "CORS_ORIGINS", "RATE_LIMIT_MAX", "PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE"]
+    },
+    "test": { "outputs": [] },
+    "check": { "outputs": [] }
+  }
+}

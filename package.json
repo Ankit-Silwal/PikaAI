@@ -1,0 +1,21 @@
+{
+  "name": "pikaai",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "npm@11.6.1",
+  "engines": { "node": ">=24 <25", "npm": ">=11" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "npm run start --workspace=@pikaai/backend",
+    "test": "turbo run test",
+    "check": "turbo run check",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose stop postgres",
+    "docker:up": "docker compose up -d --build --wait",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": { "turbo": "2.11.9" }
+}

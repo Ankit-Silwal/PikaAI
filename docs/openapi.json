@@ -1,0 +1,114 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PikaAI backend",
+    "version": "0.1.0",
+    "description": "Public setup and test endpoints. CORS uses an explicit origin allowlist. API requests have a per-IP, per-process rate limit (default 100/minute); health probes are exempt. All routes may return 403 for disallowed browser origins."
+  },
+  "servers": [{ "url": "http://localhost:3001" }],
+  "paths": {
+    "/api/test": {
+      "get": {
+        "operationId": "getTest",
+        "summary": "Check the API",
+        "responses": {
+          "200": {
+            "description": "Backend is running",
+            "content": { "application/json": {
+              "schema": { "$ref": "#/components/schemas/MessageResponse" },
+              "example": { "success": true, "data": { "message": "PikaAI backend is running" } }
+            } }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/test/echo": {
+      "post": {
+        "operationId": "echoTest",
+        "summary": "Validate and echo a trimmed message",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["message"],
+              "properties": { "message": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S", "description": "Must contain a non-whitespace character. Trimmed in the response." } }
+            },
+            "example": { "message": "hello" }
+          } }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated message",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MessageResponse" }, "example": { "success": true, "data": { "message": "hello" } } } }
+          },
+          "400": { "description": "Invalid JSON or missing, blank, non-string, or oversized message", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "413": { "description": "JSON body exceeds 16 KB", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/test/db": {
+      "get": {
+        "operationId": "getDatabaseTest",
+        "summary": "Query the current PostgreSQL timestamp",
+        "responses": {
+          "200": {
+            "description": "PostgreSQL query succeeded",
+            "content": { "application/json": { "schema": {
+              "type": "object", "required": ["success", "data"],
+              "properties": {
+                "success": { "const": true },
+                "data": { "type": "object", "required": ["database", "timestamp"], "properties": { "database": { "const": "connected" }, "timestamp": { "type": "string", "format": "date-time" } } }
+              }
+            } } }
+          },
+          "503": { "description": "Database unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "getLiveness",
+        "summary": "Check process liveness without a database query",
+        "responses": {
+          "200": { "description": "Process is live", "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "const": "ok" } } } } } }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Check database readiness",
+        "responses": {
+          "200": { "description": "Database reachable", "content": { "application/json": { "schema": { "type": "object", "required": ["status", "database"], "properties": { "status": { "const": "ready" }, "database": { "const": "connected" } } } } } },
+          "503": { "description": "Database unavailable", "content": { "application/json": { "schema": { "type": "object", "required": ["status", "database"], "properties": { "status": { "const": "not_ready" }, "database": { "const": "unavailable" } } } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MessageResponse": {
+        "type": "object", "required": ["success", "data"],
+        "properties": { "success": { "const": true }, "data": { "type": "object", "required": ["message"], "properties": { "message": { "type": "string" } } } }
+      },
+      "Error": {
+        "type": "object", "required": ["success", "error"],
+        "properties": {
+          "success": { "const": false },
+          "error": { "type": "object", "required": ["message", "requestId"], "properties": { "message": { "type": "string" }, "requestId": { "type": "string", "format": "uuid" } } }
+        }
+      }
+    },
+    "responses": {
+      "RateLimited": {
+        "description": "API request limit exceeded. Retry after the indicated number of seconds.",
+        "headers": { "Retry-After": { "schema": { "type": "integer", "minimum": 1 } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}
