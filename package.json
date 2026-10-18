@@ -3,19 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "npm@11.6.1",
-  "engines": { "node": ">=24 <25", "npm": ">=11" },
-  "workspaces": ["apps/*", "packages/*"],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "npm run start --workspace=@pikaai/backend",
-    "test": "turbo run test",
     "check": "turbo run check",
-    "setup": "npm run setup:env --workspace=@pikaai/backend",
-    "db:migrate": "npm run db:migrate --workspace=@pikaai/backend",
     "db:generate": "npm run db:generate --workspace=@pikaai/backend",
-    "db:studio": "npm run db:studio --workspace=@pikaai/backend",
-    "test:integration": "npm run test:integration --workspace=@pikaai/backend",
     "infra:up": "docker compose up -d --wait postgres redis",
     "db:up": "docker compose up -d --wait postgres redis",
     "db:down": "docker compose stop postgres",
@@ -23,5 +24,7 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f"
   },
-  "devDependencies": { "turbo": "2.11.9" }
+  "devDependencies": {
+    "turbo": "2.11.9"
+  }
 }

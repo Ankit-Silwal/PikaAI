@@ -5,8 +5,8 @@ node_modules/
 !.env.example
 coverage/
 dist/
+apps/api/src/generated/
 *.tsbuildinfo
-apps/backend/src/generated/
 *.log
 .DS_Store
 Thumbs.db
