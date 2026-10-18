@@ -8,4 +8,5 @@ node_modules
 coverage
 **/coverage
 **/dist
+**/src/generated
 *.log

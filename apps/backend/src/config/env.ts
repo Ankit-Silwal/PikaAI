@@ -31,12 +31,26 @@ for (const origin of corsOrigins) {
   }
 }
 
+const jwtSecret = required("JWT_SECRET");
+if (!/^[a-f\d]{64}$/i.test(jwtSecret)) {
+  throw new Error("JWT_SECRET must be 64 hexadecimal characters. Run npm run setup.");
+}
+
 export const env = {
   nodeEnv,
   host: process.env.HOST ?? "0.0.0.0",
   port: positiveInteger("PORT", 3001, 65535),
   corsOrigins,
   rateLimitMax: positiveInteger("RATE_LIMIT_MAX", 100),
+  authRateLimitMax: positiveInteger("AUTH_RATE_LIMIT_MAX", 10),
+  jwtSecret,
+  jwtAccessTtlSeconds: positiveInteger("JWT_ACCESS_TTL_SECONDS", 900, 3600),
+  authActivityTtlSeconds: positiveInteger("AUTH_ACTIVITY_TTL_SECONDS", 86400, 604800),
+  redis: {
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: positiveInteger("REDIS_PORT", 56379, 65535),
+    password: required("REDIS_PASSWORD"),
+  },
   database: {
     host: process.env.PGHOST ?? "localhost",
     port: positiveInteger("PGPORT", 55432, 65535),

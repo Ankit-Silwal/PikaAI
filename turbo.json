@@ -1,13 +1,15 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "db:generate": { "cache": false },
+    "build": { "dependsOn": ["^build", "db:generate"], "outputs": ["dist/**"] },
     "dev": {
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["NODE_ENV", "HOST", "PORT", "CORS_ORIGINS", "RATE_LIMIT_MAX", "PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE"]
+      "dependsOn": ["db:generate"],
+      "passThroughEnv": ["NODE_ENV", "HOST", "PORT", "CORS_ORIGINS", "RATE_LIMIT_MAX", "AUTH_RATE_LIMIT_MAX", "JWT_SECRET", "JWT_ACCESS_TTL_SECONDS", "AUTH_ACTIVITY_TTL_SECONDS", "PGHOST", "PGPORT", "PGUSER", "PGPASSWORD", "PGDATABASE", "REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD"]
     },
-    "test": { "outputs": [] },
-    "check": { "outputs": [] }
+    "test": { "dependsOn": ["db:generate"], "outputs": [] },
+    "check": { "dependsOn": ["db:generate"], "outputs": [] }
   }
 }

@@ -9,7 +9,9 @@ Install Node.js 24 and Docker Desktop with Linux containers, then run from the r
 ```powershell
 Copy-Item .env.example .env
 npm install
+npm run setup
 npm run db:up
+npm run db:migrate
 npm run dev
 ```
 
@@ -65,6 +67,13 @@ Add each feature's router under `routes/`, handlers under `controllers/`, and mo
 Relative imports use `.js` extensions so the compiled ES modules run directly in Node; TypeScript resolves those imports to the `.ts` source files during development.
 
 ## Test endpoints
+
+The authentication/resource contract is in [docs/api.md](docs/api.md). Prisma
+owns the schema and migration history under `apps/backend/prisma`. Run
+`npm run setup` after installing dependencies to initialize new local secrets;
+populated secrets and existing settings are preserved. `npm run db:up` starts
+PostgreSQL and Redis. Docker applies Prisma migrations in a one-shot service
+before starting the backend.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
