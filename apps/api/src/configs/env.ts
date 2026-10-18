@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 config({ path: fileURLToPath(new URL("../../../../.env", import.meta.url)), quiet: true });
 
@@ -27,8 +28,14 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? "",
   smtpPass: process.env.SMTP_PASS ?? "",
   smtpFrom: process.env.SMTP_FROM || process.env.SMTP_USER || "",
+  documentUploadDir: resolve(fileURLToPath(new URL("../../../../", import.meta.url)), process.env.DOCUMENT_UPLOAD_DIR ?? "uploads"),
+  maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES ?? 10 * 1024 * 1024),
 };
 
 if (env.accessSecret === env.refreshSecret) {
   throw new Error("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different");
+}
+
+if (!Number.isSafeInteger(env.maxUploadBytes) || env.maxUploadBytes < 1 || env.maxUploadBytes > 2147483647) {
+  throw new Error("MAX_UPLOAD_BYTES must be an integer between 1 and 2147483647");
 }

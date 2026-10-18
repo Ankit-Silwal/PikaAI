@@ -6,6 +6,7 @@ node_modules/
 coverage/
 dist/
 apps/api/src/generated/
+uploads/
 *.tsbuildinfo
 *.log
 .DS_Store

@@ -29,6 +29,13 @@ enum OrganizationMembershipStatus {
   ACTIVE
 }
 
+enum DocumentProcessingStatus {
+  QUEUED
+  PROCESSING
+  AWAITING_RAG
+  FAILED
+}
+
 model User {
   user_id       String                   @id @default(uuid()) @db.Uuid
   role          Role                     @default(USER)
@@ -37,6 +44,7 @@ model User {
   password_hash String
   created_at    DateTime                 @default(now()) @db.Timestamptz(6)
   memberships   OrganizationMembership[]
+  documents     Document[]
 
   @@map("auth_users")
 }
@@ -48,6 +56,7 @@ model Organization {
   invite_code     String                   @unique @db.Char(32)
   created_at      DateTime                 @default(now()) @db.Timestamptz(6)
   memberships     OrganizationMembership[]
+  documents       Document[]
 
   @@map("auth_organizations")
 }
@@ -64,4 +73,21 @@ model OrganizationMembership {
   @@id([organization_id, user_id])
   @@index([user_id])
   @@map("auth_organization_memberships")
+}
+
+model Document {
+  document_id     String                   @id @db.Uuid
+  organization_id String                   @db.Uuid
+  uploaded_by     String                   @db.Uuid
+  original_name   String                   @db.VarChar(255)
+  mime_type       String                   @db.VarChar(255)
+  size_bytes      Int
+  status          DocumentProcessingStatus @default(QUEUED)
+  created_at      DateTime                 @default(now()) @db.Timestamptz(6)
+  organization    Organization             @relation(fields: [organization_id], references: [organization_id], onDelete: Cascade)
+  uploader        User                     @relation(fields: [uploaded_by], references: [user_id], onDelete: Cascade)
+
+  @@index([organization_id])
+  @@index([uploaded_by])
+  @@map("auth_documents")
 }

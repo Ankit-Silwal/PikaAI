@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import { organizationRoutes } from "./modules/organizations/organization.routes.js";
+import { documentRoutes } from "./modules/documents/document.routes.js";
 
 export const app = express();
 
@@ -16,4 +17,5 @@ app.use(cookieParser());
 app.use("/health", healthRoutes);
 app.use("/auth", authRoutes);
 app.use("/organizations", organizationRoutes);
+app.use("/organizations/:organizationId/documents", documentRoutes);
 app.use(errorHandler);

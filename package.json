@@ -15,6 +15,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "start": "npm run start --workspace=@pikaai/backend",
+    "worker": "npm run worker --workspace=@pikaai/backend",
     "check": "turbo run check",
     "db:generate": "npm run db:generate --workspace=@pikaai/backend",
     "db:migrate": "npm run db:migrate --workspace=@pikaai/backend",

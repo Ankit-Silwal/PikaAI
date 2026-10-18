@@ -8,6 +8,7 @@ apps/api/
   prisma.config.ts
   src/
     configs/
+      bullmq.ts
       db.ts
       env.ts
     middleware/
@@ -27,11 +28,20 @@ apps/api/
         organization.controller.ts
         organization.service.ts
         organization.types.ts
+      documents/
+        document.routes.ts
+        document.controller.ts
+        document.service.ts
+        document.types.ts
+        document.upload.ts
+        document.queue.ts
+        document.worker.ts
     utils/
       jwt.ts
       http-error.ts
     app.ts
     server.ts
+    worker.ts
 ```
 
 Each feature will live in `src/modules/<feature>/` with its own routes, controller,
@@ -177,3 +187,45 @@ missing authentication returns `401`; non-admin access to admin endpoints return
 Run `npm run db:migrate` to create `auth_organizations` and
 `auth_organization_memberships`. Tables from the older backend remain untouched.
 No organization rate limits are configured.
+
+## Document uploads and worker
+
+Organization documents are uploaded with `multipart/form-data`, using a single
+file field named `file`. Both endpoints require a Bearer access token and an
+`ACTIVE` membership in the organization; pending users and outsiders return `403`.
+
+| Endpoint | Response |
+| --- | --- |
+| `POST /organizations/:organizationId/documents` | `202 { "document": {...}, "jobId": "<document_id>" }` after BullMQ accepts the job |
+| `GET /organizations/:organizationId/documents/:documentId` | `200 { "document": {...} }` with the current processing status; `404` for a missing document or one from another organization |
+
+Document metadata contains `document_id`, `organization_id`, `uploaded_by`,
+`original_name`, `mime_type`, `size_bytes`, `status`, and `created_at`. File contents
+are stored under server-generated IDs in `DOCUMENT_UPLOAD_DIR` (default `uploads/`
+at the repository root), outside public routes and Git. The upload must be nonempty;
+`MAX_UPLOAD_BYTES` defaults to 10485760 (10 MiB). Larger uploads return `413`;
+missing files and invalid multipart fields return `400`. File types are preserved
+as metadata; extraction and supported RAG formats will be implemented later.
+
+Redis holds BullMQ jobs containing only a document ID. The worker loads metadata
+from PostgreSQL and checks the stored file is readable, advancing
+`QUEUED` → `PROCESSING` → `AWAITING_RAG`. `AWAITING_RAG` means the upload has reached
+the future RAG processing hook; text extraction, chunking, embeddings, and indexing
+are not implemented yet. Failed processing retries up to three times with
+exponential backoff, then records `FAILED`. Retrying an already prepared document
+does not repeat preparation. Queue submission failures return `503` and clean up
+the new document record and file; no successful upload is reported without a job.
+
+Run `npm run db:migrate`, then `npm run dev` for the API and `npm run worker` in a
+second terminal for the worker. After a production build, the worker entry point
+is `node apps/api/dist/worker.js`. Without a running worker, accepted jobs remain
+queued. The API and worker must use the same Redis, `REDIS_KEY_PREFIX`, database,
+and upload directory. Separate hosts/containers require that directory to be
+mounted as shared persistent storage. Completed and failed queue history keeps
+the most recent 1000 jobs of each kind; document metadata and files are retained.
+There are no new rate limits or external RAG integrations.
+
+The filesystem, PostgreSQL, and Redis are separate writes. Normal request failures
+are cleaned up, but a process crash between writes can leave an orphaned upload
+or a queued record without a job; this initial implementation has no outbox or
+background reconciliation.

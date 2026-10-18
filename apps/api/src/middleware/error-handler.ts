@@ -1,10 +1,15 @@
 import type { ErrorRequestHandler } from "express";
+import { MulterError } from "multer";
 import { Prisma } from "../generated/prisma/client.js";
 import { HttpError } from "../utils/http-error.js";
 
 export const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
   if (error instanceof HttpError) {
     res.status(error.status).json({ error: error.message });
+  } else if (error instanceof MulterError) {
+    res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({
+      error: error.code === "LIMIT_FILE_SIZE" ? "Document exceeds the upload size limit" : "Upload one document in the file field",
+    });
   } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
     res.status(409).json({ error: "Email already registered" });
   } else if (error instanceof SyntaxError && "status" in error && error.status === 400) {
