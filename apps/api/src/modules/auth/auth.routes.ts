@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { env } from "../../configs/env.js";
 import { authenticate } from "../../middleware/authenticate.js";
+import { loginRateLimit, otpRateLimit, registerRateLimit } from "../../middleware/rate-limit.js";
 import { HttpError } from "../../utils/http-error.js";
 import * as controller from "./auth.controller.js";
 
@@ -16,8 +17,9 @@ authRoutes.use((req, res, next) => {
   next();
 });
 
-authRoutes.post("/register", controller.register);
-authRoutes.post("/login", controller.login);
+authRoutes.post("/send-otp", otpRateLimit, controller.sendOtp);
+authRoutes.post("/register", registerRateLimit, controller.register);
+authRoutes.post("/login", loginRateLimit, controller.login);
 authRoutes.post("/refresh", controller.refresh);
 authRoutes.post("/logout", controller.logout);
 authRoutes.get("/me", authenticate, controller.me);

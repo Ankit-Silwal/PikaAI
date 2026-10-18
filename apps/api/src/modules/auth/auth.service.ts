@@ -4,13 +4,22 @@ import { prisma } from "../../configs/db.js";
 import { HttpError } from "../../utils/http-error.js";
 import { createTokens, hashRefreshToken, verifyToken } from "../../utils/jwt.js";
 import type { AuthResult, AuthUser } from "./auth.types.js";
+import { consumeRegistrationOtp, sendRegistrationOtp } from "./otp.service.js";
 
 const publicUser = { user_id: true, email: true, role: true } as const;
 
-export async function register(email: string, password: string): Promise<AuthResult> {
+export async function sendOtp(email: string): Promise<void> {
   if (await prisma.user.findUnique({ where: { email }, select: { user_id: true } })) {
     throw new HttpError(409, "Email already registered");
   }
+  await sendRegistrationOtp(email);
+}
+
+export async function register(email: string, password: string, otp: string): Promise<AuthResult> {
+  if (await prisma.user.findUnique({ where: { email }, select: { user_id: true } })) {
+    throw new HttpError(409, "Email already registered");
+  }
+  await consumeRegistrationOtp(email, otp);
   const identity: AuthUser = { user_id: randomUUID(), email, role: "USER" };
   const tokens = createTokens(identity);
   const user = await prisma.user.create({

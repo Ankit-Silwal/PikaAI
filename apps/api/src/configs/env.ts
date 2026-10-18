@@ -17,6 +17,16 @@ export const env = {
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
   accessSecret: jwtSecret("JWT_ACCESS_SECRET"),
   refreshSecret: jwtSecret("JWT_REFRESH_SECRET"),
+  redisHost: process.env.REDIS_HOST ?? "localhost",
+  redisPort: Number(process.env.REDIS_PORT ?? 56379),
+  redisPassword: process.env.REDIS_PASSWORD || undefined,
+  redisPrefix: process.env.REDIS_KEY_PREFIX ?? "pikaai:",
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpSecure: process.env.SMTP_SECURE === "true",
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPass: process.env.SMTP_PASS ?? "",
+  smtpFrom: process.env.SMTP_FROM || process.env.SMTP_USER || "",
 };
 
 if (env.accessSecret === env.refreshSecret) {
