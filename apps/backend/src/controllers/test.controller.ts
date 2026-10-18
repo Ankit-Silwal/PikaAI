@@ -17,7 +17,7 @@ export const echoTest: RequestHandler = (req, res) => {
 
 export const getDatabaseTest: RequestHandler = async (req, res) => {
   try {
-    const { rows } = await req.app.locals.database.query("SELECT NOW() AS timestamp");
+    const rows = await req.app.locals.prisma.$queryRaw<{ timestamp: Date }[]>`SELECT NOW() AS timestamp`;
     res.json({ success: true, data: { database: "connected", timestamp: rows[0]?.timestamp } });
   } catch (error) {
     console.error({ requestId: req.id, error });

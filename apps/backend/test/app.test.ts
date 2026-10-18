@@ -3,11 +3,16 @@ import { test } from "node:test";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import type { AppOptions } from "../src/app.js";
+import type { PrismaClient } from "../src/generated/prisma/client.js";
+import { MemoryAuthState } from "./helpers/memory-auth-state.js";
+import { TokenService } from "../src/services/token.service.js";
 
 const timestamp = "2026-10-19T00:00:00.000Z";
 function makeApp(overrides: Partial<AppOptions> = {}) {
   return createApp({
-    database: { async query() { return { rows: [{ timestamp }] }; } },
+    prisma: { async $queryRaw() { return [{ timestamp }]; } } as unknown as PrismaClient,
+    authState: new MemoryAuthState(),
+    tokens: new TokenService("ab".repeat(32)),
     corsOrigins: ["http://localhost:3000"],
     logRequests: false,
     ...overrides,
@@ -75,7 +80,7 @@ test("unknown routes return a consistent JSON 404", async () => {
 
 test("readiness succeeds with a connected database", async () => {
   const response = await request(makeApp()).get("/health/ready").expect(200);
-  assert.deepEqual(response.body, { status: "ready", database: "connected" });
+  assert.deepEqual(response.body, { status: "ready", database: "connected", redis: "connected" });
 });
 
 test("database test returns a timestamp", async () => {
@@ -86,7 +91,7 @@ test("database test returns a timestamp", async () => {
 
 test("database failure returns 503 while liveness remains healthy", async (t) => {
   t.mock.method(console, "error", () => {});
-  const app = makeApp({ database: { async query() { throw new Error("private connection details"); } } });
+  const app = makeApp({ prisma: { async $queryRaw() { throw new Error("private connection details"); } } as unknown as PrismaClient });
   const ready = await request(app).get("/health/ready").expect(503);
   assert.equal(ready.body.status, "not_ready");
   const database = await request(app).get("/api/test/db").expect(503);

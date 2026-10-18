@@ -6,10 +6,13 @@ healthRoutes.get("/live", (req, res) => {
 });
 
 healthRoutes.get("/ready", async (req, res) => {
-  try {
-    await req.app.locals.database.query("SELECT 1");
-    res.json({ status: "ready", database: "connected" });
-  } catch {
-    res.status(503).json({ status: "not_ready", database: "unavailable" });
-  }
+  const [database, redis] = await Promise.allSettled([
+    req.app.locals.prisma.$queryRaw`SELECT 1`, req.app.locals.authState.ping(),
+  ]);
+  const ready = database.status === "fulfilled" && redis.status === "fulfilled";
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ready" : "not_ready",
+    database: database.status === "fulfilled" ? "connected" : "unavailable",
+    redis: redis.status === "fulfilled" ? "connected" : "unavailable",
+  });
 });

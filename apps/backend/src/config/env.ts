@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
+import { isIP } from "node:net";
 
 dotenv.config({ path: fileURLToPath(new URL("../../../../.env", import.meta.url)), quiet: true });
 
@@ -36,11 +37,22 @@ if (!/^[a-f\d]{64}$/i.test(jwtSecret)) {
   throw new Error("JWT_SECRET must be 64 hexadecimal characters. Run npm run setup.");
 }
 
+const trustedProxies = (process.env.TRUST_PROXY_CIDRS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+for (const proxy of trustedProxies) {
+  const [address = "", prefix, ...extra] = proxy.split("/");
+  const family = isIP(address);
+  if (!family || extra.length || (prefix !== undefined &&
+    (!/^\d+$/u.test(prefix) || Number(prefix) > (family === 4 ? 32 : 128)))) {
+    throw new Error("TRUST_PROXY_CIDRS must contain explicit IP addresses or CIDRs");
+  }
+}
+
 export const env = {
   nodeEnv,
   host: process.env.HOST ?? "0.0.0.0",
   port: positiveInteger("PORT", 3001, 65535),
   corsOrigins,
+  trustedProxies,
   rateLimitMax: positiveInteger("RATE_LIMIT_MAX", 100),
   authRateLimitMax: positiveInteger("AUTH_RATE_LIMIT_MAX", 10),
   jwtSecret,
