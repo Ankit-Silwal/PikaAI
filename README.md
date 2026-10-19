@@ -1,6 +1,7 @@
 # PikaAI
 
-Minimal Express + TypeScript backend in `apps/api`.
+Separate TypeScript apps for the Express API (`apps/api`) and BullMQ worker
+(`apps/worker`), with their queue contract in `packages/queues`.
 
 ```text
 apps/api/
@@ -35,13 +36,21 @@ apps/api/
         document.types.ts
         document.upload.ts
         document.queue.ts
-        document.worker.ts
     utils/
       jwt.ts
       http-error.ts
     app.ts
     server.ts
-    worker.ts
+apps/worker/
+  src/
+    configs/
+      bullmq.ts
+      db.ts
+      env.ts
+    modules/documents/document.worker.ts
+    server.ts
+packages/queues/
+  src/index.ts
 ```
 
 Each feature will live in `src/modules/<feature>/` with its own routes, controller,
@@ -55,6 +64,9 @@ belongs in `middleware`.
 2. Copy `.env.example` to `.env`, set PostgreSQL, Redis, SMTP, and JWT settings (see below).
 3. Run `npm run db:up`, `npm run db:migrate`, then `npm run dev`.
 
+`npm run dev` starts the API and worker as separate processes. To run them
+individually, use `npm run dev:api` and `npm run worker` in separate terminals.
+
 `GET http://localhost:3001/health` returns `{ "status": "ok" }`.
 Prisma checks PostgreSQL on startup and logs connection errors to the terminal.
 The server still starts if PostgreSQL is unavailable; `/health` checks server liveness.
@@ -62,7 +74,9 @@ Redis must be available at startup because authentication relies on it for rate
 limits and OTP verification.
 
 Prisma's client generates automatically for dev, build, and check.
-Run `npm run check` for type checking, or `npm run build` then `npm start`.
+Run `npm run check` for type checking. `npm run build` builds the shared queue
+package and both apps. Start the production API with `npm start` and the
+production worker separately with `npm run worker:start`.
 
 ## Authentication
 
@@ -216,10 +230,19 @@ exponential backoff, then records `FAILED`. Retrying an already prepared documen
 does not repeat preparation. Queue submission failures return `503` and clean up
 the new document record and file; no successful upload is reported without a job.
 
-Run `npm run db:migrate`, then `npm run dev` for the API and `npm run worker` in a
-second terminal for the worker. After a production build, the worker entry point
-is `node apps/api/dist/worker.js`. Without a running worker, accepted jobs remain
-queued. The API and worker must use the same Redis, `REDIS_KEY_PREFIX`, database,
+The standalone worker lives entirely in `apps/worker`: its entry point is
+`src/server.ts`, and its processor is `src/modules/documents/document.worker.ts`.
+It has its own package, build, PostgreSQL pool, Redis connections, and configuration.
+It imports no API application code and needs no JWT or SMTP settings. The API only
+enqueues jobs. `@pikaai/queues` shares the queue name and job payload type.
+
+Run `npm run db:migrate`, then `npm run dev:api` for the API and `npm run worker`
+in a second terminal for the worker. After `npm run build`, use `npm start` and
+`npm run worker:start` as independent production processes; the worker entry point
+is `node apps/worker/dist/server.js`. The worker accepts environment variables or
+an optional `apps/worker/.env` (see its `.env.example`), with the repository `.env`
+as a local fallback. Without a running worker, accepted jobs remain queued.
+The API and worker must use the same Redis, `REDIS_KEY_PREFIX`, database,
 and upload directory. Separate hosts/containers require that directory to be
 mounted as shared persistent storage. Completed and failed queue history keeps
 the most recent 1000 jobs of each kind; document metadata and files are retained.

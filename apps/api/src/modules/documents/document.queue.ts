@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
 import { bullmqConnection, bullmqPrefix, DOCUMENT_QUEUE_NAME } from "../../configs/bullmq.js";
 import { HttpError } from "../../utils/http-error.js";
-import type { DocumentJobData } from "./document.types.js";
+import type { DocumentJobData } from "@pikaai/queues";
 
 let queue: Queue<DocumentJobData> | undefined;
 

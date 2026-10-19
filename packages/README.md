@@ -1,4 +1,5 @@
 # Shared packages
 
-Put reusable workspace packages here when another app needs them. The Express
-backend currently lives entirely in `apps/backend`; no shared package is needed yet.
+`queues` exports the BullMQ queue name and document job payload type used by
+`apps/api` and `apps/worker`. It contains no application configuration or database
+connections. Each app has its own entry point and runtime dependencies.

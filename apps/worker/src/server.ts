@@ -1,7 +1,7 @@
-import { prisma } from "./configs/db.js";
+import { pool } from "./configs/db.js";
 import { createDocumentWorker } from "./modules/documents/document.worker.js";
 
-await prisma.$queryRaw`SELECT 1`;
+await pool.query("SELECT 1");
 const worker = createDocumentWorker();
 await worker.waitUntilReady();
 console.log("Document worker ready");
@@ -11,7 +11,7 @@ async function shutdown(): Promise<void> {
   if (closing) return;
   closing = true;
   await worker.close();
-  await prisma.$disconnect();
+  await pool.end();
 }
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

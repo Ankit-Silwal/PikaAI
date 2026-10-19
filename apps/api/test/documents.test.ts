@@ -8,8 +8,9 @@ import { basename, dirname, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, before, test } from "node:test";
 import type { Worker } from "bullmq";
+import type { DocumentJobData } from "@pikaai/queues";
 import type { AuthUser } from "../src/modules/auth/auth.types.js";
-import type { DocumentJobData, DocumentUploadResponse } from "../src/modules/documents/document.types.js";
+import type { DocumentUploadResponse } from "../src/modules/documents/document.types.js";
 
 const prefix = "document-test-" + randomUUID();
 const redisPrefix = "pikaai:test:" + randomUUID() + ":";
@@ -26,7 +27,8 @@ let worker: Worker<DocumentJobData, void> | undefined;
 let prisma: typeof import("../src/configs/db.js").prisma;
 let redis: typeof import("../src/configs/redis.js").redis;
 let queueModule: typeof import("../src/modules/documents/document.queue.js");
-let workerModule: typeof import("../src/modules/documents/document.worker.js");
+let workerModule: typeof import("../../worker/src/modules/documents/document.worker.js");
+let workerPool: typeof import("../../worker/src/configs/db.js").pool;
 let bullmqConnection: typeof import("../src/configs/bullmq.js").bullmqConnection;
 const tokens = new Map<string, string>();
 
@@ -40,7 +42,8 @@ before(async () => {
   ({ redis } = await import("../src/configs/redis.js"));
   ({ bullmqConnection } = await import("../src/configs/bullmq.js"));
   queueModule = await import("../src/modules/documents/document.queue.js");
-  workerModule = await import("../src/modules/documents/document.worker.js");
+  workerModule = await import("../../worker/src/modules/documents/document.worker.js");
+  ({ pool: workerPool } = await import("../../worker/src/configs/db.js"));
   const { createTokens } = await import("../src/utils/jwt.js");
   for (const actor of actors) tokens.set(actor.user_id, createTokens(actor).accessToken);
   await prisma.user.createMany({ data: actors.map(actor => ({ ...actor, password_hash: "unused-test-password-hash" })) });
@@ -91,6 +94,7 @@ after(async () => {
     }
   } finally {
     if (prisma) await prisma.$disconnect();
+    if (workerPool) await workerPool.end();
     if (redis?.isOpen) redis.destroy();
     if (uploadDir) {
       // Verify the absolute deletion target is the specific test directory.

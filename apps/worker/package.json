@@ -1,0 +1,25 @@
+{
+  "name": "@pikaai/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pikaai/queues": "0.1.0",
+    "bullmq": "6.3.17",
+    "dotenv": "18.0.8",
+    "ioredis": "6.0.0",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

@@ -8,4 +8,4 @@ export const bullmqConnection = {
 };
 
 export const bullmqPrefix = env.redisPrefix + "bullmq";
-export const DOCUMENT_QUEUE_NAME = "document-processing";
+export { DOCUMENT_QUEUE_NAME } from "@pikaai/queues";
