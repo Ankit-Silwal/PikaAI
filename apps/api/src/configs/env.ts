@@ -14,6 +14,8 @@ function jwtSecret(name: string): string {
 
 export const env = {
   port: Number(process.env.PORT ?? 3001),
+  ragServiceUrl: (process.env.RAG_SERVICE_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, ""),
+  ragServiceToken: process.env.RAG_SERVICE_TOKEN ?? "",
   production: process.env.NODE_ENV === "production",
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
   accessSecret: jwtSecret("JWT_ACCESS_SECRET"),

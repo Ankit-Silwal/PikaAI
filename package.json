@@ -22,7 +22,7 @@
     "db:generate": "npm run db:generate --workspace=@pikaai/backend",
     "db:migrate": "npm run db:migrate --workspace=@pikaai/backend",
     "test": "npm run build --workspace=@pikaai/queues && npm run db:generate && npm run test --workspace=@pikaai/backend",
-    "infra:up": "docker compose up -d --wait postgres redis",
+    "infra:up": "docker compose up -d --wait postgres redis qdrant",
     "db:up": "docker compose up -d --wait postgres redis",
     "db:down": "docker compose stop postgres",
     "docker:up": "docker compose up -d --build --wait",

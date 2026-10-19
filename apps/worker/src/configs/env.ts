@@ -10,6 +10,8 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for the
 
 export const env = {
   databaseUrl: process.env.DATABASE_URL,
+  ragServiceUrl: (process.env.RAG_SERVICE_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, ""),
+  ragServiceToken: process.env.RAG_SERVICE_TOKEN ?? "",
   redisHost: process.env.REDIS_HOST ?? "localhost",
   redisPort: Number(process.env.REDIS_PORT ?? 56379),
   redisPassword: process.env.REDIS_PASSWORD || undefined,

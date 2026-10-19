@@ -30,6 +30,7 @@ enum OrganizationMembershipStatus {
 }
 
 enum DocumentProcessingStatus {
+  READY
   QUEUED
   PROCESSING
   AWAITING_RAG

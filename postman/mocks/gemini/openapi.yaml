@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: Gemini OpenAI-compatible chat subset
+  version: 1.0.0
+servers:
+  - url: https://generativelanguage.googleapis.com/v1beta/openai
+paths:
+  /chat/completions:
+    post:
+      description: Test subset based on Google's OpenAI compatibility documentation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, messages]
+              properties:
+                model: {type: string}
+                messages: {type: array, items: {type: object}}
+      responses:
+        '200':
+          description: Completed chat response
+          content:
+            application/json:
+              schema: {type: object}
+        '503':
+          description: Provider unavailable

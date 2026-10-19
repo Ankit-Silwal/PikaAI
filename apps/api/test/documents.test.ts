@@ -36,6 +36,8 @@ before(async () => {
   uploadDir = await mkdtemp(join(tmpdir(), "pikaai-documents-"));
   Object.assign(process.env, {
     NODE_ENV: "test", REDIS_KEY_PREFIX: redisPrefix, DOCUMENT_UPLOAD_DIR: uploadDir, MAX_UPLOAD_BYTES: "1024",
+    RAG_SERVICE_URL: process.env.TEST_RAG_SERVICE_URL ?? "http://127.0.0.1:18000",
+    RAG_SERVICE_TOKEN: "rag-integration-test-token",
   });
   const { app } = await import("../src/app.js");
   ({ prisma } = await import("../src/configs/db.js"));
@@ -125,7 +127,7 @@ async function json(response: Response, status: number) {
 }
 
 async function waitFor<T>(read: () => Promise<T>, matches: (value: T) => boolean): Promise<T> {
-  const deadline = Date.now() + 15000;
+  const deadline = Date.now() + 120000;
   while (Date.now() < deadline) {
     const value = await read();
     if (matches(value)) return value;
@@ -202,15 +204,15 @@ test("Organization document uploads through PostgreSQL, disk, Redis, and a real 
     assert.equal((await fetch(baseUrl + "/uploads/" + uploaded.document.document_id)).status, 404);
   });
 
-  await t.test("a BullMQ worker consumes the stored upload and marks it awaiting future RAG", async () => {
+  await t.test("a BullMQ worker sends the upload to the Python RAG service and marks it ready", async () => {
     worker = workerModule.createDocumentWorker();
     await worker.waitUntilReady();
-    await waitFor(() => prisma.document.findUniqueOrThrow({ where: { document_id: uploaded.jobId } }), doc => doc.status === "AWAITING_RAG");
+    await waitFor(() => prisma.document.findUniqueOrThrow({ where: { document_id: uploaded.jobId } }), doc => doc.status === "READY");
     const job = await queueModule.getDocumentQueue().getJob(uploaded.jobId);
     assert.ok(job);
     await waitFor(() => job.getState(), state => state === "completed");
     const body = await json(await request("GET", member, undefined, "/" + uploaded.jobId), 200);
-    assert.equal(body.document.status, "AWAITING_RAG");
+    assert.equal(body.document.status, "READY");
     assert.equal(await readFile(join(uploadDir, uploaded.jobId), "utf8"), "Document content for a future RAG pipeline.");
   });
 
@@ -227,14 +229,14 @@ test("Organization document uploads through PostgreSQL, disk, Redis, and a real 
     assert.equal((await prisma.document.findUniqueOrThrow({ where: { document_id: body.jobId } })).status, "FAILED");
   });
 
-  await t.test("a redelivered prepared document does not run preparation again", async () => {
+  await t.test("a redelivered indexed document does not run indexing again", async () => {
     await rm(join(uploadDir, uploaded.jobId));
     const job = await queueModule.getDocumentQueue().getJob(uploaded.jobId);
     assert.ok(job);
     const completed = once(worker!, "completed");
     await job.retry("completed");
     await completed;
-    assert.equal((await prisma.document.findUniqueOrThrow({ where: { document_id: uploaded.jobId } })).status, "AWAITING_RAG");
+    assert.equal((await prisma.document.findUniqueOrThrow({ where: { document_id: uploaded.jobId } })).status, "READY");
   });
 
   await t.test("an unreachable queue returns 503, cleans up the upload, and recovers", async () => {
@@ -261,6 +263,25 @@ test("Organization document uploads through PostgreSQL, disk, Redis, and a real 
       await queueModule.closeDocumentQueue();
     }
     const recovered: DocumentUploadResponse = await json(await request("POST", admin, fileForm("Recovered upload.")), 202);
-    await waitFor(() => prisma.document.findUniqueOrThrow({ where: { document_id: recovered.jobId } }), doc => doc.status === "AWAITING_RAG");
+    await waitFor(() => prisma.document.findUniqueOrThrow({ where: { document_id: recovered.jobId } }), doc => doc.status === "READY");
+  });
+
+  await t.test("queries require active membership and ignore client-supplied organization IDs", async () => {
+    const query = (actor?: AuthUser, org = organizationId, question = "What do the documents contain?") => fetch(
+      baseUrl + "/organizations/" + org + "/documents/query", {
+        method: "POST", headers: { "Content-Type": "application/json", ...(actor ? { Authorization: "Bearer " + tokens.get(actor.user_id) } : {}) },
+        body: JSON.stringify({ question, organization_id: organizationId }),
+      },
+    );
+    assert.equal((await query()).status, 401);
+    for (const actor of [pending, outsider]) assert.equal((await query(actor)).status, 403);
+    assert.equal((await query(member, organizationId, " ")).status, 400);
+    const result = await json(await query(member), 200);
+    assert.ok(result.answer);
+    assert.ok(result.sources.length > 0);
+    assert.ok(result.sources.every((source: { document_id: string }) => source.document_id));
+    const other = await json(await query(admin, otherOrganizationId), 200);
+    assert.deepEqual(other.sources, []);
+    assert.equal((await query(member, organizationId, "__provider_error__")).status, 503);
   });
 });

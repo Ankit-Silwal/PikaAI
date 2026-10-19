@@ -1,7 +1,8 @@
 # PikaAI
 
 Separate TypeScript apps for the Express API (`apps/api`) and BullMQ worker
-(`apps/worker`), with their queue contract in `packages/queues`.
+(`apps/worker`), a Python RAG microservice (`apps/rag`), and a shared queue contract
+in `packages/queues`.
 
 ```text
 apps/api/
@@ -218,16 +219,16 @@ Document metadata contains `document_id`, `organization_id`, `uploaded_by`,
 are stored under server-generated IDs in `DOCUMENT_UPLOAD_DIR` (default `uploads/`
 at the repository root), outside public routes and Git. The upload must be nonempty;
 `MAX_UPLOAD_BYTES` defaults to 10485760 (10 MiB). Larger uploads return `413`;
-missing files and invalid multipart fields return `400`. File types are preserved
-as metadata; extraction and supported RAG formats will be implemented later.
+missing files and invalid multipart fields return `400`. RAG processing supports
+UTF-8 TXT/Markdown and text-based PDFs. Unsupported, encrypted, invalid, or scanned
+documents fail in the worker; OCR is not included.
 
 Redis holds BullMQ jobs containing only a document ID. The worker loads metadata
-from PostgreSQL and checks the stored file is readable, advancing
-`QUEUED` → `PROCESSING` → `AWAITING_RAG`. `AWAITING_RAG` means the upload has reached
-the future RAG processing hook; text extraction, chunking, embeddings, and indexing
-are not implemented yet. Failed processing retries up to three times with
-exponential backoff, then records `FAILED`. Retrying an already prepared document
-does not repeat preparation. Queue submission failures return `503` and clean up
+and sends the stored file to the separate Python RAG service over HTTP, advancing
+`QUEUED` → `PROCESSING` → `READY` only after Qdrant indexing succeeds. Failed
+processing retries up to three times with exponential backoff, then records
+`FAILED`. Retrying a `READY` document skips indexing; stable Qdrant point IDs also
+make retries after a worker crash overwrite the same chunks. Queue submission failures return `503` and clean up
 the new document record and file; no successful upload is reported without a job.
 
 The standalone worker lives entirely in `apps/worker`: its entry point is
@@ -246,9 +247,107 @@ The API and worker must use the same Redis, `REDIS_KEY_PREFIX`, database,
 and upload directory. Separate hosts/containers require that directory to be
 mounted as shared persistent storage. Completed and failed queue history keeps
 the most recent 1000 jobs of each kind; document metadata and files are retained.
-There are no new rate limits or external RAG integrations.
+The Python service receives file bytes and needs no shared upload mount. There
+are no additional rate limits.
 
 The filesystem, PostgreSQL, and Redis are separate writes. Normal request failures
 are cleaned up, but a process crash between writes can leave an orphaned upload
 or a queued record without a job; this initial implementation has no outbox or
 background reconciliation.
+
+## Python semantic RAG service
+
+`apps/rag` runs independently from the API and BullMQ worker. It extracts text,
+splits each page into overlapping chunks, embeds them locally with
+`HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")`, and stores them using
+`QdrantVectorStore`. Queries use semantic vector similarity, retrieve up to five
+chunks from the requested organization, and send their text, filenames, and PDF
+page labels to `gemini-3.1-flash-lite` through the OpenAI-compatible Gemini API.
+This uses dense semantic retrieval with overlapping character chunks.
+
+Set `api_key` to your Gemini key in the root `.env` or `apps/rag/.env`. The standard
+`GEMINI_API_KEY` name is also accepted. The RAG service loads its own `.env` after
+the root fallback; process environment values take precedence. Set
+`RAG_SERVICE_TOKEN` to the same random value in the API, worker, and RAG service.
+This internal credential protects indexing and querying; browser clients use
+their normal access JWT through the Express endpoint below. Keep the RAG service
+on an internal network; Compose binds its port and Qdrant to localhost.
+
+The example environment uses `QDRANT_COLLECTION=learning_rag` and
+`QDRANT_URL=http://localhost:6333`. A missing collection is created with 384-dimensional
+cosine vectors; an existing collection must use the same BGE embeddings and
+LangChain payload format. Use a fresh collection and reindex if changing embedding
+models. `GEMINI_GENERATION_MODEL` defaults to your chosen `gemini-3.1-flash-lite`.
+`RAG_SERVICE_URL` defaults to `http://127.0.0.1:8000` in the API and worker.
+
+Start the service in Docker:
+
+```sh
+docker compose up -d qdrant
+docker compose --profile rag up -d --build rag
+npm run db:migrate
+npm run dev
+```
+
+Or run Python separately (Python 3.12+):
+
+```sh
+cd apps/rag
+python -m venv .venv
+# Windows: .venv/Scripts/python; Linux/macOS: .venv/bin/python
+.venv/Scripts/python -m pip install -r requirements.txt
+.venv/Scripts/python -m uvicorn rag.main:app --host 127.0.0.1 --port 8000
+```
+
+Startup downloads the public BGE model if needed and loads it before accepting
+requests; subsequent starts reuse cached weights. Docker persists weights in
+`embedding_cache` and Qdrant data in `qdrant_data`. CPU inference needs enough RAM
+for PyTorch and the model. Gemini credentials are needed for answers, while
+indexing uses local embeddings and can work before a Gemini key is supplied.
+
+| Endpoint | Request | Response |
+| --- | --- | --- |
+| Express `POST /organizations/:organizationId/documents/query` | Bearer JWT; `{ "question": "What is the refund policy?" }` | `200 { "answer", "sources": [{ "document_id", "filename", "chunk_index", "text", "page_label" }] }` |
+| Internal Python `POST /documents/index` | Service Bearer token; multipart `document_id`, `organization_id`, `file` | `200 { "document_id", "chunk_count" }` after indexing |
+| Internal Python `POST /query` | Service Bearer token; `{ "organization_id": "<uuid>", "question": "..." }` | Same answer/source format |
+| Python `GET /health` | None | `200 { "status": "ok" }`, process liveness |
+
+Only active organization members can use the Express query route. The server
+takes the organization ID from the authorized URL; a client cannot override it
+in the body. Retrieval always filters Qdrant by `metadata.organization_id`.
+Empty organizations return an explanatory answer and an empty source list
+without calling Gemini. Questions must contain 1–4000 characters. Missing RAG
+configuration and upstream failures return `503` through Express. Python returns
+`415` for unsupported formats, `422` for unreadable/empty documents, and `413`
+above `MAX_UPLOAD_BYTES`. Its OpenAPI contract and interactive docs are available
+at `/openapi.json` and `/docs`.
+
+Sources identify retrieved excerpts; model-generated citations should still be
+checked against those excerpts. PDF page labels are preserved; TXT/Markdown have
+`page_label: null`. Documents are immutable. Indexing uses batches, so chunks may
+be searchable while a large document is still being indexed or retrying. Existing
+`AWAITING_RAG` rows from the earlier placeholder are retained; re-upload those
+documents to index them through the new pipeline.
+
+### RAG integration checks
+
+The tests use real local Qdrant and BGE embeddings, with Gemini simulated from
+[Google's documented OpenAI-compatible contract](https://ai.google.dev/gemini-api/docs/openai).
+Postman owner-mock discovery was unavailable because the CLI was signed out.
+No real Gemini requests or billable calls are made by these checks.
+
+Start `postman simulation run postman/simulations/rag.sim.yaml --port 4900` in one
+terminal. Then run `python -m pip install -r requirements-dev.txt` and
+`python -m pytest tests -q` from `apps/rag`. Tests create and delete their own
+uniquely named Qdrant collection. They verify extraction, PDF page references,
+semantic retrieval, organization filtering, idempotent indexing, and provider
+errors; the simulation rejects requests that omit interpolated context.
+
+For `npm test`, also run a test RAG process on port 18000 with
+`RAG_SERVICE_TOKEN=rag-integration-test-token`, `api_key=test-only-key`,
+`GEMINI_BASE_URL=http://127.0.0.1:4900/gemini/v1beta/openai/`, and a dedicated
+`QDRANT_COLLECTION=pikaai_node_tests` in its process environment. Use
+`python -m uvicorn rag.main:app --host 127.0.0.1 --port 18000` from `apps/rag`.
+The Node suite then exercises uploads through BullMQ into Python, membership
+checks on queries, and provider failure responses. Delete only that dedicated
+test collection after stopping the test process.

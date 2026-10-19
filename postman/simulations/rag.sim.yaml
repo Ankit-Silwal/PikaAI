@@ -1,0 +1,5 @@
+simulation: rag-gemini
+routing: path
+mocks:
+  - routeKey: gemini
+    path: ../mocks/gemini/server/config.yaml

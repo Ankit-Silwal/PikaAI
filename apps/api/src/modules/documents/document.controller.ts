@@ -32,3 +32,11 @@ export async function get(req: Request, res: Response<DocumentResponse, Document
   const documentId = uuid(req.params.documentId, "Document ID");
   res.json(await service.get(res.locals.organizationId, documentId));
 }
+
+export async function query(req: Request, res: Response<unknown, DocumentLocals>): Promise<void> {
+  const question = req.body?.question;
+  if (typeof question !== "string" || !question.trim() || question.trim().length > 4000) {
+    throw new HttpError(400, "Question must contain 1 to 4000 characters");
+  }
+  res.json(await service.query(res.locals.organizationId, question.trim()));
+}
